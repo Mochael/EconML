@@ -561,7 +561,7 @@ class _OrthoLearner(TreatmentExpansionMixin, LinearCateEstimator):
     def _fit_nuisances(self, Y, T, X=None, W=None, Z=None, sample_weight=None, groups=None):
         # use a binary array to get stratified split in case of discrete treatment
         stratify = self._discrete_treatment or self._discrete_instrument
-        strata = self._strata(Y, T, X=X, W=W, Z=Z, sample_weight=sample_weight)
+        strata = self._strata(Y, T, X=X, W=W, Z=Z, sample_weight=sample_weight, groups=groups)
         if strata is None:
             strata = T  # always safe to pass T as second arg to split even if we're not actually stratifying
 
