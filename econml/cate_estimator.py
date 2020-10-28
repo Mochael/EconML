@@ -286,7 +286,7 @@ class LinearCateEstimator(BaseCateEstimator):
     """Base class for all CATE estimators with linear treatment effects in this package."""
 
     @abc.abstractmethod
-    def const_marginal_effect(self, X=None):
+    def const_marginal_effect(self, X=None, *, n_rows=None):
         """
         Calculate the constant marginal CATE :math:`\\theta(·)`.
 
@@ -297,6 +297,10 @@ class LinearCateEstimator(BaseCateEstimator):
         ----------
         X: optional (m, d_x) matrix or None (Default=None)
             Features for each sample.
+        n_rows: optional int
+            Number of rows to return if X is None; if no number of rows is specified and X is None
+            then 1 row will be returned. If X is not None and a value is provided for the number of rows,
+            that value must agree with the number of rows in X.
 
         Returns
         -------
@@ -379,28 +383,22 @@ class LinearCateEstimator(BaseCateEstimator):
 
     def marginal_effect_interval(self, T, X=None, *, alpha=0.1):
         X, T = self._expand_treatments(X, T)
-        effs = self.const_marginal_effect_interval(X=X, alpha=alpha)
-        return tuple(np.repeat(eff, shape(T)[0], axis=0) if X is None else eff
-                     for eff in effs)
+        if X is not None:
+            return self.const_marginal_effect_interval(X=X, alpha=alpha)
+        else:  # need to pass the number of rows of T to ensure the right shape
+            return self.const_marginal_effect_interval(X=X, alpha=alpha, n_rows=shape(T)[0])
     marginal_effect_interval.__doc__ = BaseCateEstimator.marginal_effect_interval.__doc__
 
     def marginal_effect_inference(self, T, X=None):
         X, T = self._expand_treatments(X, T)
-        cme_inf = self.const_marginal_effect_inference(X=X)
-        pred = cme_inf.point_estimate
-        pred_stderr = cme_inf.stderr
-        if X is None:
-            pred = np.repeat(pred, shape(T)[0], axis=0)
-            pred_stderr = np.repeat(pred_stderr, shape(T)[0], axis=0)
-        # TODO: It seems wrong to return inference results based on a normal approximation
-        #       even in the case where const_marginal_effect_inference was actually generated
-        #       using bootstrap
-        return NormalInferenceResults(d_t=cme_inf.d_t, d_y=cme_inf.d_y, pred=pred,
-                                      pred_stderr=pred_stderr, inf_type='effect', fname_transformer=None)
+        if X is not None:
+            return self.const_marginal_effect_inference(X=X)
+        else:  # need to pass the number of rows of T to ensure the right shape
+            return self.const_marginal_effect_inference(X=X, n_rows=shape(T)[0])
     marginal_effect_inference.__doc__ = BaseCateEstimator.marginal_effect_inference.__doc__
 
     @BaseCateEstimator._defer_to_inference
-    def const_marginal_effect_interval(self, X=None, *, alpha=0.1):
+    def const_marginal_effect_interval(self, X=None, *, alpha=0.1, n_rows=None):
         """ Confidence intervals for the quantities :math:`\\theta(X)` produced
         by the model. Available only when ``inference`` is not ``None``, when
         calling the fit method.
@@ -412,6 +410,10 @@ class LinearCateEstimator(BaseCateEstimator):
         alpha: optional float in [0, 1] (Default=0.1)
             The overall level of confidence of the reported interval.
             The alpha/2, 1-alpha/2 confidence interval is reported.
+        n_rows: optional int
+            Number of rows to return if X is None; if no number of rows is specified and X is None
+            then 1 row will be returned. If X is not None and a value is provided for the number of rows,
+            that value must agree with the number of rows in X.
 
         Returns
         -------
@@ -422,7 +424,7 @@ class LinearCateEstimator(BaseCateEstimator):
         pass
 
     @BaseCateEstimator._defer_to_inference
-    def const_marginal_effect_inference(self, X=None):
+    def const_marginal_effect_inference(self, X=None, *, n_rows=None):
         """ Inference results for the quantities :math:`\\theta(X)` produced
         by the model. Available only when ``inference`` is not ``None``, when
         calling the fit method.
@@ -431,6 +433,10 @@ class LinearCateEstimator(BaseCateEstimator):
         ----------
         X: optional (m, d_x) matrix or None (Default=None)
             Features for each sample
+        n_rows: optional int
+            Number of rows to return if X is None; if no number of rows is specified and X is None
+            then 1 row will be returned. If X is not None and a value is provided for the number of rows,
+            that value must agree with the number of rows in X.
 
         Returns
         -------

@@ -969,7 +969,7 @@ class BLBInference(Inference):
         self._T_vec = (T0.ndim == 1)
         return self
 
-    def const_marginal_effect_interval(self, X=None, *, alpha=0.1):
+    def const_marginal_effect_interval(self, X=None, *, alpha=0.1, n_rows=None):
         """ Confidence intervals for the quantities :math:`\\theta(X)` produced
         by the model. Available only when ``inference`` is ``blb``, when
         calling the fit method.
@@ -989,6 +989,9 @@ class BLBInference(Inference):
                              type of :meth:`const_marginal_effect(X)<const_marginal_effect>` )
             The lower and the upper bounds of the confidence interval for each quantity.
         """
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
+
         params_and_cov = self._predict_wrapper(X)
         # Calculate confidence intervals for the parameter (marginal effect)
         lower = alpha / 2
@@ -1000,7 +1003,11 @@ class BLBInference(Inference):
         param_lower, param_upper = np.asarray(param_lower), np.asarray(param_upper)
         if self._T_vec:
             # If T is a vector, preserve shape of the effect interval
-            return param_lower.flatten(), param_upper.flatten()
+            param_lower = param_lower.flatten()
+            param_upper = param_upper.flatten()
+        if repeat_X:
+            param_lower = np.repeat(param_lower, n_rows, axis=0)
+            param_upper = np.repeat(param_upper, n_rows, axis=0)
         return param_lower, param_upper
 
     def effect_interval(self, X=None, *, T0=0, T1=1, alpha=0.1):

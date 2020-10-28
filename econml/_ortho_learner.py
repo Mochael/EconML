@@ -613,22 +613,25 @@ class _OrthoLearner(TreatmentExpansionMixin, LinearCateEstimator):
                                                                                    sample_weight=sample_weight,
                                                                                    sample_var=sample_var))
 
-    def const_marginal_effect(self, X=None):
+    def const_marginal_effect(self, X=None, *, n_rows=None):
         self._check_fitted_dims(X)
         if X is None:
-            return self._model_final.predict()
+            pred = self._model_final.predict()
+            return pred if n_rows is None else np.repeat(pred, n_rows, axis=0)
         else:
+            if n_rows is not None:
+                assert shape(X)[0] == n_rows
             return self._model_final.predict(X)
     const_marginal_effect.__doc__ = LinearCateEstimator.const_marginal_effect.__doc__
 
-    def const_marginal_effect_interval(self, X=None, *, alpha=0.1):
+    def const_marginal_effect_interval(self, X=None, *, alpha=0.1, n_rows=None):
         self._check_fitted_dims(X)
-        return super().const_marginal_effect_interval(X, alpha=alpha)
+        return super().const_marginal_effect_interval(X, alpha=alpha, n_rows=n_rows)
     const_marginal_effect_interval.__doc__ = LinearCateEstimator.const_marginal_effect_interval.__doc__
 
-    def const_marginal_effect_inference(self, X=None):
+    def const_marginal_effect_inference(self, X=None, *, n_rows=None):
         self._check_fitted_dims(X)
-        return super().const_marginal_effect_inference(X)
+        return super().const_marginal_effect_inference(X, n_rows=n_rows)
     const_marginal_effect_inference.__doc__ = LinearCateEstimator.const_marginal_effect_inference.__doc__
 
     def effect_interval(self, X=None, *, T0=0, T1=1, alpha=0.1):

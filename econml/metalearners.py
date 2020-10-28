@@ -165,7 +165,7 @@ class SLearner(TreatmentExpansionMixin, LinearCateEstimator):
         feat_arr = np.concatenate((X, T), axis=1)
         self.overall_model.fit(feat_arr, Y)
 
-    def const_marginal_effect(self, X=None):
+    def const_marginal_effect(self, X=None, *, n_rows=None):
         """Calculate the constant marginal treatment effect on a vector of features for each sample.
 
         Parameters
@@ -180,6 +180,9 @@ class SLearner(TreatmentExpansionMixin, LinearCateEstimator):
             Note that when Y is a vector rather than a 2-dimensional array,
             the corresponding singleton dimensions in the output will be collapsed
         """
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
+
         # Check inputs
         if X is None:
             X = np.zeros((1, 1))
@@ -192,6 +195,8 @@ class SLearner(TreatmentExpansionMixin, LinearCateEstimator):
             taus = (prediction - np.repeat(prediction[:, :, 0], self._d_t[0] + 1).reshape(prediction.shape))[:, :, 1:]
         else:
             taus = (prediction - np.repeat(prediction[:, 0], self._d_t[0] + 1).reshape(prediction.shape))[:, 1:]
+        if repeat_X:
+            taus = np.repeat(taus, n_rows, axis=0)
         return taus
 
 

@@ -133,17 +133,26 @@ class GenericModelFinalInference(Inference):
         self.d_t = self._d_t[0] if self._d_t else 1
         self.d_y = self._d_y[0] if self._d_y else 1
 
-    def const_marginal_effect_interval(self, X, *, alpha=0.1):
+    def const_marginal_effect_interval(self, X, *, alpha=0.1, n_rows=None):
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
         if X is None:
             X = np.ones((1, 1))
         elif self.featurizer is not None:
             X = self.featurizer.transform(X)
         X, T = broadcast_unit_treatments(X, self.d_t)
         preds = self._predict_interval(cross_product(X, T), alpha=alpha)
-        return tuple(reshape_treatmentwise_effects(pred, self._d_t, self._d_y)
-                     for pred in preds)
+        preds = tuple(reshape_treatmentwise_effects(pred, self._d_t, self._d_y)
+                      for pred in preds)
+        if repeat_X:
+            preds = tuple(np.repeat(pred, n_rows, axis=0)
+                          for pred in preds)
 
-    def const_marginal_effect_inference(self, X):
+        return preds
+
+    def const_marginal_effect_inference(self, X, *, n_rows=None):
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
         if X is None:
             X = np.ones((1, 1))
         elif self.featurizer is not None:
@@ -154,6 +163,9 @@ class GenericModelFinalInference(Inference):
             raise AttributeError("Final model doesn't support prediction standard eror, "
                                  "please call const_marginal_effect_interval to get confidence interval.")
         pred_stderr = reshape_treatmentwise_effects(self._prediction_stderr(cross_product(X, T)), self._d_t, self._d_y)
+        if repeat_X:
+            pred = np.repeat(pred, n_rows, axis=0)
+            pred_stderr = np.repeat(pred_stderr, n_rows, axis=0)
         return NormalInferenceResults(d_t=self.d_t, d_y=self.d_y, pred=pred,
                                       pred_stderr=pred_stderr, inf_type='effect', fname_transformer=None)
 
@@ -370,23 +382,37 @@ class GenericModelFinalInferenceDiscrete(Inference):
         if hasattr(estimator, 'fit_cate_intercept'):
             self.fit_cate_intercept = estimator.fit_cate_intercept
 
-    def const_marginal_effect_interval(self, X, *, alpha=0.1):
+    def const_marginal_effect_interval(self, X, *, alpha=0.1, n_rows=None):
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
+
         if (X is not None) and (self.featurizer is not None):
             X = self.featurizer.transform(X)
         preds = np.array([mdl.predict_interval(X, alpha=alpha) for mdl in self.fitted_models_final])
-        return tuple(np.moveaxis(preds, [0, 1], [-1, 0]))  # send treatment to the end, pull bounds to the front
+        preds = tuple(np.moveaxis(preds, [0, 1], [-1, 0]))  # send treatment to the end, pull bounds to the front
+        if repeat_X:
+            preds = tuple(np.repeat(pred, n_rows, axis=0) for pred in preds)
+        return preds
 
-    def const_marginal_effect_inference(self, X):
+    def const_marginal_effect_inference(self, X, *, n_rows=None):
+        assert X is None or n_rows is None or n_rows == shape(X)[0]
+        repeat_X = X is None and n_rows is not None
+
         if (X is not None) and (self.featurizer is not None):
             X = self.featurizer.transform(X)
         pred = np.array([mdl.predict(X) for mdl in self.fitted_models_final])
+        pred = np.moveaxis(pred, 0, -1)  # send treatment to the end, pull bounds to the front
         if not hasattr(self.fitted_models_final[0], 'prediction_stderr'):
             raise AttributeError("Final model doesn't support prediction standard eror, "
                                  "please call const_marginal_effect_interval to get confidence interval.")
         pred_stderr = np.array([mdl.prediction_stderr(X) for mdl in self.fitted_models_final])
-        return NormalInferenceResults(d_t=self.d_t, d_y=self.d_y, pred=np.moveaxis(pred, 0, -1),
-                                      # send treatment to the end, pull bounds to the front
-                                      pred_stderr=np.moveaxis(pred_stderr, 0, -1), inf_type='effect',
+        pred_stderr = np.moveaxis(pred_stderr, 0, -1)  # send treatment to the end, pull bounds to the front
+
+        if repeat_X:
+            pred = np.repeat(pred, n_rows, axis=0)
+            pred_stderr = np.repeat(pred_stderr, n_rows, axis=0)
+        return NormalInferenceResults(d_t=self.d_t, d_y=self.d_y, pred=pred,
+                                      pred_stderr=pred_stderr, inf_type='effect',
                                       fname_transformer=None)
 
     def effect_interval(self, X, *, T0, T1, alpha=0.1):
